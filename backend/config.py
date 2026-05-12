@@ -40,6 +40,11 @@ class Settings(BaseSettings):
         description="Ollama model name to use"
     )
 
+    DATABASE_URL: str = Field(
+        default="sqlite+aiosqlite:///./chatbot.db",
+        description="Database connection URL"
+    )
+
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
     def assemble_cors_origins(cls, v: Any) -> List[str]:

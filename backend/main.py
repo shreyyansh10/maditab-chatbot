@@ -3,6 +3,8 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from config import get_settings
+from routers import chat, conversation
+from database import engine, Base
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -25,11 +27,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(chat.router)
+app.include_router(conversation.router)
+
 @app.on_event("startup")
 async def startup_event():
-    """Log application startup information."""
+    """Log application startup information and initialize DB."""
     logger.info(f"Application Environment: {settings.ENVIRONMENT}")
     logger.info(f"CORS Origins allowed: {settings.CORS_ORIGINS}")
+    
+    # Initialize database
+    async with engine.begin() as conn:
+        # Create tables
+        await conn.run_sync(Base.metadata.create_all)
+    logger.info("Database initialized successfully.")
 
 @app.get("/health")
 async def health_check() -> dict[str, str]:
