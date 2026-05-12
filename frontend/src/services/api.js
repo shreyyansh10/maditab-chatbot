@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const apiClient = axios.create({
+export const apiClient = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '',
   headers: {
     'Content-Type': 'application/json',
@@ -23,8 +23,13 @@ apiClient.interceptors.response.use(
   }
 );
 
-export const sendMessage = async (message) => {
-  const response = await apiClient.post('/api/chat/message', { message });
-  // The backend returns { response: "message string" }
-  return response.data.response;
+export const sendMessage = async (message, conversationId = null) => {
+  const payload = { message };
+  if (conversationId) {
+    payload.conversation_id = conversationId;
+  }
+  
+  const response = await apiClient.post('/api/chat/message', payload);
+  // The backend returns { response, conversation_id, user_message_id, assistant_message_id }
+  return response.data;
 };

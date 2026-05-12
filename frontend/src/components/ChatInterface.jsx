@@ -1,33 +1,95 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import MessageList from './MessageList';
 import MessageInput from './MessageInput';
 import { sendMessage } from '../services/api';
+import { getConversation } from '../services/conversationApi';
 
-function ChatInterface() {
-  const [messages, setMessages] = useState([
-    { role: 'assistant', content: 'Hello! How can I help you today?' },
-  ]);
+const DEFAULT_MESSAGES = [
+  { role: 'assistant', content: 'Hello! How can I help you today?' },
+];
+
+function ChatInterface({ conversationId }) {
+  const [messages, setMessages] = useState(DEFAULT_MESSAGES);
   const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(false);
+  const messagesEndRef = useRef(null);
+
+  // Auto-scroll to bottom whenever messages change
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, loading]);
+
+  // Load conversation messages when ID changes
+  useEffect(() => {
+    const loadConversation = async () => {
+      if (!conversationId) {
+        setMessages(DEFAULT_MESSAGES);
+        return;
+      }
+
+      try {
+        setInitialLoading(true);
+        const data = await getConversation(conversationId);
+        if (data.messages && data.messages.length > 0) {
+          setMessages(data.messages);
+        } else {
+          setMessages(DEFAULT_MESSAGES);
+        }
+      } catch (error) {
+        console.error('Failed to load conversation history:', error);
+        setMessages(DEFAULT_MESSAGES);
+      } finally {
+        setInitialLoading(false);
+      }
+    };
+
+    loadConversation();
+  }, [conversationId]);
 
   const handleSend = async (content) => {
-    const userMessage = { role: 'user', content };
+    if (!content.trim()) return;
+
+    // 1. Optimistic Update
+    const userMessage = { role: 'user', content, id: Date.now().toString() };
     setMessages((prev) => [...prev, userMessage]);
     setLoading(true);
 
     try {
-      const response = await sendMessage(content);
-      setMessages((prev) => [...prev, { role: 'assistant', content: response }]);
-    } catch (error) {
-      let errorMessage = 'Sorry, there was an error processing your request.';
-      if (error.response && error.response.data && error.response.data.detail) {
-        errorMessage = `Error: ${error.response.data.detail}`;
-      } else if (error.message) {
-        errorMessage = `Error: ${error.message}`;
+      // 2. Send to API
+      const result = await sendMessage(content, conversationId);
+      
+      // 3. Update messages with actual AI response
+      setMessages((prev) => [
+        ...prev, 
+        { role: 'assistant', content: result.response, id: result.assistant_message_id }
+      ]);
+
+      // 4. Handle new conversation creation by backend
+      if (!conversationId && result.conversation_id) {
+        window.dispatchEvent(new CustomEvent('conversationCreated', { 
+          detail: { conversationId: result.conversation_id } 
+        }));
       }
+    } catch (error) {
+      console.error('Error sending message:', error);
+      
+      // 5. Remove optimistic message if it failed and show error (or keep it and mark as failed)
+      // For simplicity, we'll just show an error message and keep the history
+      let errorMessage = 'Sorry, there was an error processing your request.';
+      if (error.response?.data?.detail) {
+        errorMessage = `Error: ${error.response.data.detail}`;
+      }
+      
       setMessages((prev) => [
         ...prev,
-        { role: 'assistant', content: errorMessage },
+        { role: 'assistant', content: errorMessage, isError: true },
       ]);
+      
+      alert('Failed to send message. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -35,26 +97,57 @@ function ChatInterface() {
 
   return (
     <div className="flex flex-col h-full bg-offwhite w-full">
-      <div className="border-b border-brown-200 p-4 bg-white shadow-sm flex-shrink-0">
-        <h1 className="text-xl font-bold text-brown-700 text-center">AI Chatbot</h1>
+      {/* Header */}
+      <div className="border-b border-brown-200 p-4 bg-white shadow-sm flex-shrink-0 z-10">
+        <h1 className="text-xl font-bold text-brown-700 text-center flex items-center justify-center gap-2">
+          <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+          AI Chat Assistant
+        </h1>
       </div>
-      <div className="flex-1 overflow-hidden flex flex-col max-w-4xl mx-auto w-full">
-        <MessageList messages={messages} />
-        {loading && (
-          <div className="px-4 pb-4 flex justify-start">
-            <div className="bg-white border border-gray-200 rounded-lg p-3">
-              <span className="text-sm text-brown-500 italic flex items-center">
-                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-brown-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Assistant is typing...
-              </span>
+
+      {/* Main Chat Area */}
+      <div className="flex-1 overflow-hidden flex flex-col relative">
+        {initialLoading ? (
+          <div className="flex-1 flex items-center justify-center bg-offwhite/50 backdrop-blur-sm z-10">
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-10 h-10 border-4 border-brown-200 border-t-brown-600 rounded-full animate-spin"></div>
+              <p className="text-brown-500 font-medium">Loading conversation...</p>
             </div>
           </div>
-        )}
+        ) : null}
+
+        <div className="flex-1 overflow-y-auto px-4 py-6 scrollbar-thin scrollbar-thumb-brown-200">
+          <div className="max-w-4xl mx-auto space-y-6">
+            <MessageList messages={messages} />
+            
+            {loading && (
+              <div className="flex justify-start animate-fade-in">
+                <div className="bg-white border border-brown-100 rounded-2xl rounded-tl-none p-4 shadow-sm max-w-[80%]">
+                  <div className="flex items-center gap-3">
+                    <div className="flex gap-1">
+                      <div className="w-2 h-2 bg-brown-400 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+                      <div className="w-2 h-2 bg-brown-400 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+                      <div className="w-2 h-2 bg-brown-400 rounded-full animate-bounce"></div>
+                    </div>
+                    <span className="text-sm text-brown-500 font-medium italic">Assistant is thinking...</span>
+                  </div>
+                </div>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+        </div>
       </div>
-      <MessageInput onSend={handleSend} loading={loading} />
+
+      {/* Input Area */}
+      <div className="bg-white border-t border-brown-100 p-4 shadow-[0_-4px_12px_rgba(0,0,0,0.03)]">
+        <div className="max-w-4xl mx-auto">
+          <MessageInput onSend={handleSend} loading={loading || initialLoading} />
+          <p className="text-[10px] text-center text-brown-400 mt-2">
+            AI can make mistakes. Verify important information.
+          </p>
+        </div>
+      </div>
     </div>
   );
 }

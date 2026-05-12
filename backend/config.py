@@ -40,6 +40,28 @@ class Settings(BaseSettings):
         description="Ollama model name to use"
     )
 
+    # Groq Configuration
+    GROQ_API_KEY: str = Field(
+        default="",
+        description="API Key for Groq"
+    )
+
+    GROQ_MODEL: str = Field(
+        default="llama3-8b-8192",
+        description="Groq model name to use"
+    )
+
+    # Gemini Configuration
+    GEMINI_API_KEY: str = Field(
+        default="",
+        description="API Key for Gemini"
+    )
+
+    GEMINI_MODEL: str = Field(
+        default="gemini-1.5-flash",
+        description="Gemini model name to use"
+    )
+
     DATABASE_URL: str = Field(
         default="sqlite+aiosqlite:///./chatbot.db",
         description="Database connection URL"

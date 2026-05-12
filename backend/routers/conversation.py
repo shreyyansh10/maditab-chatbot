@@ -5,18 +5,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
 from schemas.conversation import (
-    ConversationCreate,
+    CreateConversationRequest,
     ConversationResponse,
-    ConversationDetailResponse
+    ConversationWithMessages,
+    CreateConversationResponse
 )
 from services import ConversationService
 
 router = APIRouter(prefix="/api/conversations", tags=["conversations"])
 logger = logging.getLogger(__name__)
 
-@router.post("", response_model=ConversationResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=CreateConversationResponse, status_code=status.HTTP_201_CREATED)
 async def create_conversation(
-    conversation: ConversationCreate,
+    conversation: CreateConversationRequest,
     session: AsyncSession = Depends(get_db)
 ):
     """Create a new conversation."""
@@ -44,7 +45,7 @@ async def list_conversations(
         logger.error(f"Failed to get conversations: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
-@router.get("/{conversation_id}", response_model=ConversationDetailResponse)
+@router.get("/{conversation_id}", response_model=ConversationWithMessages)
 async def get_conversation(
     conversation_id: str,
     session: AsyncSession = Depends(get_db)

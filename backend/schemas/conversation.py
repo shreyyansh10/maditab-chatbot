@@ -4,7 +4,7 @@ from typing import List, Optional
 
 class MessageBase(BaseModel):
     role: str = Field(..., description="Role of the sender (user or assistant)")
-    content: str = Field(..., min_length=1, description="Message content")
+    content: str = Field(..., min_length=1, max_length=2000, description="Message content")
 
 class MessageCreate(MessageBase):
     pass
@@ -20,7 +20,7 @@ class MessageResponse(MessageBase):
 class ConversationBase(BaseModel):
     title: str = Field(default="New Conversation", max_length=200)
 
-class ConversationCreate(ConversationBase):
+class CreateConversationRequest(ConversationBase):
     pass
 
 class ConversationResponse(ConversationBase):
@@ -31,5 +31,8 @@ class ConversationResponse(ConversationBase):
     class Config:
         from_attributes = True
 
-class ConversationDetailResponse(ConversationResponse):
+class ConversationWithMessages(ConversationResponse):
     messages: List[MessageResponse] = []
+
+class CreateConversationResponse(ConversationResponse):
+    pass

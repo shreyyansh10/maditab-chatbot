@@ -4,9 +4,10 @@ from schemas.conversation import (
     MessageCreate,
     MessageResponse,
     ConversationBase,
-    ConversationCreate,
+    CreateConversationRequest,
     ConversationResponse,
-    ConversationDetailResponse
+    ConversationWithMessages,
+    CreateConversationResponse
 )
 
 __all__ = [
@@ -14,7 +15,8 @@ __all__ = [
     "MessageCreate",
     "MessageResponse",
     "ConversationBase",
-    "ConversationCreate",
+    "CreateConversationRequest",
     "ConversationResponse",
-    "ConversationDetailResponse"
+    "ConversationWithMessages",
+    "CreateConversationResponse"
 ]

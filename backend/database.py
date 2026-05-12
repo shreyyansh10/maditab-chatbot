@@ -21,5 +21,6 @@ async def get_db():
     async with AsyncSessionLocal() as session:
         yield session
 
-# Add this import to ensure models are loaded
-from models import Conversation, Message
+
+# To ensure models are loaded, import them where metadata is used
+# for migrations or table creation.
