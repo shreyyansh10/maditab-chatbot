@@ -9,6 +9,7 @@ from schemas.conversation import (
     ConversationWithMessages,
     CreateConversationResponse
 )
+from schemas.suggestion import SuggestionsResponse
 
 __all__ = [
     "MessageBase",
@@ -18,5 +19,6 @@ __all__ = [
     "CreateConversationRequest",
     "ConversationResponse",
     "ConversationWithMessages",
-    "CreateConversationResponse"
+    "CreateConversationResponse",
+    "SuggestionsResponse"
 ]

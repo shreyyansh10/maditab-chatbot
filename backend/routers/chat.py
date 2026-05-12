@@ -4,13 +4,15 @@ from database import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import APIRouter, HTTPException, Depends
 from schemas.chat import ChatRequest, ChatResponse
-from services import LLMManager, ConversationService
+from schemas.suggestion import SuggestionsResponse
+from services import LLMManager, ConversationService, SuggestionService
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 logger = logging.getLogger(__name__)
 
 # Instantiate LLMManager globally to manage providers and fallback
 llm_manager = LLMManager()
+suggestion_service = SuggestionService(llm_manager)
 
 @router.post("/message", response_model=ChatResponse)
 async def chat_message(request: ChatRequest, session: AsyncSession = Depends(get_db)):
@@ -96,3 +98,44 @@ async def chat_message(request: ChatRequest, session: AsyncSession = Depends(get
         await session.rollback()
         logger.error(f"Error processing chat message: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail="An internal error occurred.")
+
+
+@router.get("/suggestions/{conversation_id}", response_model=SuggestionsResponse)
+async def get_suggestions(conversation_id: str, session: AsyncSession = Depends(get_db)):
+    """
+    Generate contextual follow-up question suggestions for a conversation.
+    """
+    try:
+        # Load conversation history
+        history_data = await ConversationService.get_conversation_with_messages(session, conversation_id)
+        
+        if not history_data:
+            raise HTTPException(status_code=404, detail="Conversation not found")
+        
+        # Get messages
+        messages = history_data.get("messages", [])
+        
+        # Format history for suggestion service
+        formatted_history = [
+            {"role": msg["role"], "content": msg["content"]}
+            for msg in messages
+        ]
+        
+        # Generate suggestions
+        suggestions = await suggestion_service.generate_suggestions(formatted_history)
+        
+        return SuggestionsResponse(
+            conversation_id=conversation_id,
+            suggestions=suggestions
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error generating suggestions: {str(e)}", exc_info=True)
+        # Return default suggestions on error instead of failing
+        from services.suggestion_service import DEFAULT_SUGGESTIONS
+        return SuggestionsResponse(
+            conversation_id=conversation_id,
+            suggestions=DEFAULT_SUGGESTIONS
+        )

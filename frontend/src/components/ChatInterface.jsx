@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import MessageList from './MessageList';
 import MessageInput from './MessageInput';
+import SuggestionBar from './SuggestionBar';
 import { sendMessage } from '../services/api';
 import { getConversation } from '../services/conversationApi';
+import { getSuggestions } from '../services/suggestionApi';
 
 const DEFAULT_MESSAGES = [
   { role: 'assistant', content: 'Hello! How can I help you today?' },
@@ -12,7 +14,13 @@ function ChatInterface({ conversationId }) {
   const [messages, setMessages] = useState(DEFAULT_MESSAGES);
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(false);
+  const [suggestions, setSuggestions] = useState([]);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const messagesEndRef = useRef(null);
+  
+  // Track current conversation to prevent stale suggestions
+  const currentConversationRef = useRef(conversationId);
+  const suggestionRequestIdRef = useRef(0);
 
   // Auto-scroll to bottom whenever messages change
   const scrollToBottom = () => {
@@ -25,6 +33,12 @@ function ChatInterface({ conversationId }) {
 
   // Load conversation messages when ID changes
   useEffect(() => {
+    // Clear suggestions immediately when conversation changes
+    console.log('Conversation changed to:', conversationId);
+    setSuggestions([]);
+    setSuggestionsLoading(false);
+    currentConversationRef.current = conversationId;
+    
     const loadConversation = async () => {
       if (!conversationId) {
         setMessages(DEFAULT_MESSAGES);
@@ -53,6 +67,11 @@ function ChatInterface({ conversationId }) {
   const handleSend = async (content) => {
     if (!content.trim()) return;
 
+    // Clear suggestions immediately before sending
+    console.log('Clearing suggestions before sending message');
+    setSuggestions([]);
+    setSuggestionsLoading(false);
+
     // 1. Optimistic Update
     const userMessage = { role: 'user', content, id: Date.now().toString() };
     setMessages((prev) => [...prev, userMessage]);
@@ -70,10 +89,20 @@ function ChatInterface({ conversationId }) {
 
       // 4. Handle new conversation creation by backend
       if (!conversationId && result.conversation_id) {
+        currentConversationRef.current = result.conversation_id;
         window.dispatchEvent(new CustomEvent('conversationCreated', { 
           detail: { conversationId: result.conversation_id } 
         }));
       }
+
+      // 5. Fetch suggestions after assistant response completes
+      // Wait a tick to ensure messages are fully updated
+      setTimeout(() => {
+        const targetConversationId = result.conversation_id || conversationId;
+        if (targetConversationId) {
+          fetchSuggestions(targetConversationId);
+        }
+      }, 100);
     } catch (error) {
       console.error('Error sending message:', error);
       
@@ -93,6 +122,41 @@ function ChatInterface({ conversationId }) {
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchSuggestions = async (convId) => {
+    // Generate unique request ID
+    const requestId = ++suggestionRequestIdRef.current;
+    
+    console.log(`Loading suggestions for: ${convId} (request #${requestId})`);
+    
+    try {
+      setSuggestionsLoading(true);
+      const data = await getSuggestions(convId);
+      
+      // Only update if this is still the current conversation
+      if (currentConversationRef.current === convId && suggestionRequestIdRef.current === requestId) {
+        console.log(`Suggestions loaded for: ${convId}`, data.suggestions);
+        setSuggestions(data.suggestions || []);
+      } else {
+        console.log(`Ignoring stale suggestions for: ${convId} (current: ${currentConversationRef.current})`);
+      }
+    } catch (error) {
+      console.error('Failed to fetch suggestions:', error);
+      // Only clear if still current conversation
+      if (currentConversationRef.current === convId && suggestionRequestIdRef.current === requestId) {
+        setSuggestions([]);
+      }
+    } finally {
+      // Only update loading state if still current
+      if (currentConversationRef.current === convId && suggestionRequestIdRef.current === requestId) {
+        setSuggestionsLoading(false);
+      }
+    }
+  };
+
+  const handleSuggestionClick = (suggestion) => {
+    handleSend(suggestion);
   };
 
   return (
@@ -141,7 +205,17 @@ function ChatInterface({ conversationId }) {
 
       {/* Input Area */}
       <div className="bg-white border-t border-brown-100 p-4 shadow-[0_-4px_12px_rgba(0,0,0,0.03)]">
-        <div className="max-w-4xl mx-auto">
+        <div className="max-w-4xl mx-auto space-y-3">
+          {/* Suggestions */}
+          {!loading && suggestions.length > 0 && (
+            <SuggestionBar 
+              suggestions={suggestions} 
+              onSuggestionClick={handleSuggestionClick}
+              loading={suggestionsLoading}
+              conversationId={conversationId}
+            />
+          )}
+          
           <MessageInput onSend={handleSend} loading={loading || initialLoading} />
           <p className="text-[10px] text-center text-brown-400 mt-2">
             AI can make mistakes. Verify important information.
