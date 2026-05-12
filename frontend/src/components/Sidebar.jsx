@@ -6,6 +6,7 @@ function Sidebar({ currentConversationId, onSelectConversation }) {
   const [conversations, setConversations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const fetchConversations = async () => {
     try {
@@ -24,7 +25,6 @@ function Sidebar({ currentConversationId, onSelectConversation }) {
   useEffect(() => {
     fetchConversations();
 
-    // Listen for custom event when a new conversation is created by the backend
     const handleConversationCreated = () => {
       fetchConversations();
     };
@@ -38,7 +38,7 @@ function Sidebar({ currentConversationId, onSelectConversation }) {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this conversation?')) {
+    if (window.confirm('Delete this conversation?')) {
       try {
         await deleteConversation(id);
         setConversations(prev => prev.filter(c => c.id !== id));
@@ -51,13 +51,18 @@ function Sidebar({ currentConversationId, onSelectConversation }) {
     }
   };
 
+  const filteredConversations = conversations.filter(conv =>
+    conv.title?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
-    <div className="w-64 bg-brown-900 h-full flex flex-col border-r border-brown-800 shadow-xl z-20">
-      {/* New Chat Button */}
-      <div className="p-4">
+    <div className="w-[280px] bg-gray-50 h-full flex flex-col border-r border-gray-200">
+      {/* Header with New Chat */}
+      <div className="p-4 border-b border-gray-200">
         <button
           onClick={handleNewChat}
-          className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-brown-700 hover:bg-brown-600 text-white rounded-lg border border-brown-600 transition-all duration-200 font-medium shadow-sm active:scale-95"
+          aria-label="Start new chat"
+          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-brown-600 hover:bg-brown-700 text-white rounded-xl transition-smooth font-medium shadow-sm active:scale-[0.98]"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -66,24 +71,41 @@ function Sidebar({ currentConversationId, onSelectConversation }) {
         </button>
       </div>
 
+      {/* Search Bar */}
+      <div className="px-4 pt-4 pb-2">
+        <div className="relative">
+          <input
+            type="text"
+            placeholder="Search chats..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full px-3 py-2 pl-9 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:border-brown-500 focus:ring-1 focus:ring-brown-500 transition-smooth"
+          />
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+        </div>
+      </div>
+
       {/* Conversations Section */}
-      <div className="flex-1 flex flex-col min-h-0">
+      <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
         <div className="px-4 py-2">
-          <h2 className="text-xs font-bold text-brown-400 uppercase tracking-widest px-2">Recent Chats</h2>
+          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Recent</h2>
         </div>
         
         {loading && conversations.length === 0 ? (
-          <div className="flex-1 flex items-center justify-center">
-            <div className="animate-pulse flex flex-col items-center">
-              <div className="h-2 w-24 bg-brown-700 rounded mb-2"></div>
-              <div className="h-2 w-16 bg-brown-800 rounded"></div>
-            </div>
+          <div className="px-4 space-y-2">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="animate-pulse">
+                <div className="h-12 bg-gray-200 rounded-xl"></div>
+              </div>
+            ))}
           </div>
         ) : error ? (
-          <div className="px-4 py-4 text-xs text-red-400 text-center italic">{error}</div>
+          <div className="px-4 py-4 text-xs text-red-500 text-center">{error}</div>
         ) : (
           <ConversationList
-            conversations={conversations}
+            conversations={filteredConversations}
             currentId={currentConversationId}
             onSelect={onSelectConversation}
             onDelete={handleDelete}
@@ -91,14 +113,15 @@ function Sidebar({ currentConversationId, onSelectConversation }) {
         )}
       </div>
 
-      {/* User / Settings Footer (Optional) */}
-      <div className="p-4 border-t border-brown-800 bg-brown-900/50">
-        <div className="flex items-center gap-3 px-2">
-          <div className="w-8 h-8 rounded-full bg-brown-500 flex items-center justify-center text-white font-bold text-xs shadow-inner">
+      {/* User Profile Footer */}
+      <div className="p-4 border-t border-gray-200">
+        <div className="flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-gray-100 transition-smooth cursor-pointer">
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-brown-500 to-brown-600 flex items-center justify-center text-white font-semibold text-sm shadow-sm">
             U
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-white truncate">User Account</p>
+            <p className="text-sm font-medium text-gray-900 truncate">User</p>
+            <p className="text-xs text-gray-500">Free Plan</p>
           </div>
         </div>
       </div>

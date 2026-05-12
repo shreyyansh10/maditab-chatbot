@@ -3,7 +3,7 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from config import get_settings
-from routers import chat, conversation
+from routers import chat, conversation, stream
 from database import engine, Base
 
 # Configure logging
@@ -29,6 +29,7 @@ app.add_middleware(
 
 app.include_router(chat.router)
 app.include_router(conversation.router)
+app.include_router(stream.router)
 
 @app.on_event("startup")
 async def startup_event():

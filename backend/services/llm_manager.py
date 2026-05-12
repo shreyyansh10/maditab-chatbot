@@ -1,5 +1,5 @@
 import logging
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, AsyncGenerator
 from services.groq_service import GroqLLMService
 from services.gemini_service import GeminiLLMService
 from services.llm_service import OllamaLLMService
@@ -51,3 +51,17 @@ class LLMManager:
         """
         full_prompt = self.prompt_service.build_prompt_with_history(message, history)
         return await self.generate(full_prompt)
+    
+    async def generate_stream(self, prompt: str) -> AsyncGenerator[str, None]:
+        """
+        Generate response and yield chunks progressively.
+        This is a lightweight chunk-based streaming (not true token streaming).
+        """
+        # Generate full response using existing method
+        full_response = await self.generate(prompt)
+        
+        # Split into words and yield progressively
+        words = full_response.split()
+        for i, word in enumerate(words):
+            # Add space before word (except first)
+            yield word if i == 0 else f" {word}"
